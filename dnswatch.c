@@ -37,7 +37,7 @@ int main(int ac, char *as[]){
     char *nameserver=S_NAMESERVER;
     char *fqdn=NULL;
     if(!parse_args(as, ac, cmd, &stime, &nameserver, &fqdn))
-        return EXIT_FAILURE;
+		return EXIT_FAILURE;
 
 	struct __res_state state;
 	memset(&state, 0, sizeof(struct __res_state));
