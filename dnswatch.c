@@ -44,12 +44,18 @@ int main(int ac, char *as[]) {
     if(!parse_args(as, ac, cmd, &stime, &nameserver, &fqdn))
         return EXIT_FAILURE;
 
+#ifndef USE_DEPRECATED
     struct __res_state state;
     memset(&state, 0, sizeof(struct __res_state));
+#endif
 
     struct sockaddr_in addr;
 
+#ifndef USE_DEPRECATED
     if(!setup_resolver(&state, &addr, nameserver)) {
+#else
+    if(!setup_resolver(&_res, &addr, nameserver)) {
+#endif
         fprintf(stderr, "Error: address of nameserver is not valid!\n");
 
 #ifndef USE_DEPRECATED
