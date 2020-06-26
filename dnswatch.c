@@ -19,7 +19,7 @@ typedef struct __res_state * res_state;
 res_state state_p=NULL;
 
 void sig_handler(int ec){
-#ifdef USE_DEPRECATED
+#ifndef USE_DEPRECATED
 	if(state_p!=NULL)
 		res_nclose(state_p);
 #else
@@ -54,7 +54,7 @@ int main(int ac, char *as[]){
 	if(!setup_resolver(&state, &addr, nameserver)){
 	    fprintf(stderr, "Error: address of nameserver is not valid!\n");
       	
-#ifdef USE_DEPRECATED
+#ifndef USE_DEPRECATED
 		res_nclose(&state);
 #else
 		res_close();
@@ -64,7 +64,7 @@ int main(int ac, char *as[]){
 
     loop(cmd, fqdn, stime);
     
-#ifdef USE_DEPRECATED
+#ifndef USE_DEPRECATED
 	res_nclose(&state);
 #else
 	res_close();
@@ -76,7 +76,7 @@ int main(int ac, char *as[]){
 int setup_resolver(res_state sp, struct sockaddr_in *addr, char *nameserver){
 	state_p=sp;
 
-#ifdef USE_DEPRECATED
+#ifndef USE_DEPRECATED
 	res_ninit(sp);
 #else
 	res_init();
@@ -98,10 +98,10 @@ char *get_ip(char *fqdn, char *dispbuf, size_t buflen, int ipv6){
 	u_char abuf[S_BUFLEN];	
 	int len;
 
-#ifdef USE_DEPRECATED
+#ifndef USE_DEPRECATED
 	if((len=res_nquery(state_p, fqdn, C_IN, T_A, abuf, sizeof(abuf)))<0)
 #else
-	if((len=res_nquery(state_p, fqdn, C_IN, T_A, abuf, sizeof(abuf)))<0)
+	if((len=res_query(fqdn, C_IN, T_A, abuf, sizeof(abuf)))<0)
 #endif
 		return NULL;
 
