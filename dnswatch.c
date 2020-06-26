@@ -26,10 +26,10 @@ void sig_handler(int ec) {
     exit(0);
 }
 
-int parse_args(char **, int, char **, int *, char **, char **);
+int parse_args(char **, int, char **, int *, int *, char **, char **);
 char *get_ip(char *, char *, size_t, int);
 int setup_resolver(res_state, struct sockaddr_in *, char *);
-void loop(char **, char *, int);
+void loop(char **, char *, int, int);
 
 int main(int ac, char *as[]) {
     signal(SIGINT, sig_handler);
@@ -41,7 +41,8 @@ int main(int ac, char *as[]) {
     int stime=S_STIME;
     char *nameserver=S_NAMESERVER;
     char *fqdn=NULL;
-    if(!parse_args(as, ac, cmd, &stime, &nameserver, &fqdn))
+    int aaaa=0;
+    if(!parse_args(as, ac, cmd, &stime, &aaaa, &nameserver, &fqdn))
         return EXIT_FAILURE;
 
 #ifndef USE_DEPRECATED
@@ -64,7 +65,7 @@ int main(int ac, char *as[]) {
         return EXIT_FAILURE;
     }
 
-    loop(cmd, fqdn, stime);
+    loop(cmd, fqdn, stime, aaaa);
 
 #ifndef USE_DEPRECATED
     res_nclose(&state);
@@ -92,16 +93,17 @@ int setup_resolver(res_state sp, struct sockaddr_in *addr, char *nameserver) {
 }
 
 
-char *get_ip(char *fqdn, char *dispbuf, size_t buflen, int ipv6) {
+char *get_ip(char *fqdn, char *dispbuf, size_t buflen, int aaaa) {
     ns_msg msg;
     ns_rr rr;
     unsigned char abuf[S_BUFLEN];
     int len;
 
+    int addr_type=aaaa?T_AAAA:T_A;
 #ifndef USE_DEPRECATED
-    if((len=res_nquery(state_p, fqdn, C_IN, T_A, abuf, sizeof(abuf)))<0)
+    if((len=res_nquery(state_p, fqdn, C_IN, addr_type, abuf, sizeof(abuf)))<0)
 #else
-    if((len=res_query(fqdn, C_IN, T_A, abuf, sizeof(abuf)))<0)
+    if((len=res_query(fqdn, C_IN, addr_type, abuf, sizeof(abuf)))<0)
 #endif
         return NULL;
 
@@ -112,16 +114,12 @@ char *get_ip(char *fqdn, char *dispbuf, size_t buflen, int ipv6) {
         ns_parserr(&msg, ns_s_an, i, &rr);
         switch(ns_rr_type(rr)) {
         case ns_t_a:
-            if(ipv6)
-                break;
             if(ns_rr_rdlen(rr)!=NS_INADDRSZ)
                 break;
             inet_ntop(AF_INET, ns_rr_rdata(rr), dispbuf, buflen);
             return dispbuf;
             break;
         case ns_t_aaaa:
-            if(!ipv6)
-                break;
             if(ns_rr_rdlen(rr)!=NS_IN6ADDRSZ)
                 break;
             inet_ntop(AF_INET6, ns_rr_rdata(rr), dispbuf, buflen);
@@ -135,15 +133,15 @@ char *get_ip(char *fqdn, char *dispbuf, size_t buflen, int ipv6) {
     return NULL;
 }
 
-void loop(char **cmd, char *fqdn, int stime) {
+void loop(char **cmd, char *fqdn, int stime, int aaaa) {
     char o_ip[128], n_ip[128];
     memset(o_ip, 0, sizeof(o_ip));
     memset(n_ip, 0, sizeof(n_ip));
 
-    get_ip(fqdn, o_ip, sizeof(o_ip), 0);
+    get_ip(fqdn, o_ip, sizeof(o_ip), aaaa);
 
     for(;;) {
-        if( get_ip(fqdn, n_ip, sizeof(n_ip), 0)!=NULL
+        if( get_ip(fqdn, n_ip, sizeof(n_ip), aaaa)!=NULL
                 && strcmp(o_ip, n_ip)!=0) {
 
             setenv("ADDRESS", n_ip, 1);
@@ -160,11 +158,11 @@ void loop(char **cmd, char *fqdn, int stime) {
 }
 
 void help(char *pname) {
-    printf("Usage: %s [@<nameserver>|T<stime>] [--] [fqdn] [command] [args]...\n", pname);
+    printf("Usage: %s [@<nameserver>|T<stime>|AAAA] [--] [fqdn] [command] [args]...\n", pname);
 }
 
 int parse_args( char **args, int arglen, char **cmd, int *stime,
-                char **nameserver, char **fqdn) {
+                int *aaaa, char **nameserver, char **fqdn) {
 #define IS(X,Y) strcmp(X,Y)==0
     if(arglen==1 || IS(args[1], "-h") || IS(args[1], "--help")) {
         help(args[0]);
@@ -187,6 +185,8 @@ int parse_args( char **args, int arglen, char **cmd, int *stime,
                 *stime*=-1;
             if(*stime==0)
                 *stime=S_STIME;
+        } else if(IS(args[i],"AAAA")) {
+            *aaaa=1;
         } else if(IS(args[i],"--")) {
             ++i;
             break;
