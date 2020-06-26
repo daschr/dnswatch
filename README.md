@@ -1,5 +1,5 @@
 # dnswatch
-Wait for changes of DNS A records and run a given command each time.
+Wait for changes of DNS A/AAAA records and run a given command each time.
 
 ## install
 * `make`
