@@ -26,10 +26,10 @@ void sig_handler(int ec) {
     exit(0);
 }
 
-int parse_args(char **, int, char **, int *, int *, char **, char **);
-char *get_ip(char *, char *, size_t, int);
-int setup_resolver(res_state, struct sockaddr_in *, char *);
-void loop(char **, char *, int, int);
+int parse_args(char **, int, char **, int *, int *, const char **, const char **);
+char *get_ip(const char *, char *, size_t, int);
+int setup_resolver(res_state, struct sockaddr_in *, const char *);
+void loop(char * const *, const char *, int, int);
 
 int main(int ac, char *as[]) {
     signal(SIGINT, sig_handler);
@@ -39,8 +39,8 @@ int main(int ac, char *as[]) {
     for(int i=0; i<ac; ++i) cmd[i]=NULL;
 
     int stime=S_STIME;
-    char *nameserver=S_NAMESERVER;
-    char *fqdn=NULL;
+    const char *nameserver=S_NAMESERVER;
+    const char *fqdn=NULL;
     int aaaa=0;
     if(!parse_args(as, ac, cmd, &stime, &aaaa, &nameserver, &fqdn))
         return EXIT_FAILURE;
@@ -74,7 +74,7 @@ int main(int ac, char *as[]) {
 }
 
 
-int setup_resolver(res_state sp, struct sockaddr_in *addr, char *nameserver) {
+int setup_resolver(res_state sp, struct sockaddr_in *addr, const char *nameserver) {
     state_p=sp;
 
 #ifndef USE_DEPRECATED
@@ -93,7 +93,7 @@ int setup_resolver(res_state sp, struct sockaddr_in *addr, char *nameserver) {
 }
 
 
-char *get_ip(char *fqdn, char *dispbuf, size_t buflen, int aaaa) {
+char *get_ip(const char *fqdn, char *dispbuf, size_t buflen, int aaaa) {
     ns_msg msg;
     ns_rr rr;
     unsigned char abuf[S_BUFLEN];
@@ -133,7 +133,7 @@ char *get_ip(char *fqdn, char *dispbuf, size_t buflen, int aaaa) {
     return NULL;
 }
 
-void loop(char **cmd, char *fqdn, int stime, int aaaa) {
+void loop(char * const *cmd, const char *fqdn, int stime, int aaaa) {
     char o_ip[128], n_ip[128];
     memset(o_ip, 0, sizeof(o_ip));
     memset(n_ip, 0, sizeof(n_ip));
@@ -162,7 +162,7 @@ void help(char *pname) {
 }
 
 int parse_args( char **args, int arglen, char **cmd, int *stime,
-                int *aaaa, char **nameserver, char **fqdn) {
+                int *aaaa, const char **nameserver, const char **fqdn) {
 #define IS(X,Y) strcmp(X,Y)==0
     if(arglen==1 || IS(args[1], "-h") || IS(args[1], "--help")) {
         help(args[0]);
