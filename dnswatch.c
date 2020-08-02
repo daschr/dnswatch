@@ -101,11 +101,13 @@ char *get_ip(const char *fqdn, char *dispbuf, size_t buflen, int aaaa) {
 
     int addr_type=aaaa?T_AAAA:T_A;
 #ifndef USE_DEPRECATED
-    if((len=res_nquery(state_p, fqdn, C_IN, addr_type, abuf, sizeof(abuf)))<0)
+    if((len=res_nquery(state_p, fqdn, C_IN, addr_type, abuf, sizeof(abuf)))<0) {
 #else
-    if((len=res_query(fqdn, C_IN, addr_type, abuf, sizeof(abuf)))<0)
+    if((len=res_query(fqdn, C_IN, addr_type, abuf, sizeof(abuf)))<0) {
 #endif
+        dispbuf[0]=0;
         return NULL;
+    }
 
     ns_initparse(abuf, len, &msg);
     len=ns_msg_count(msg, ns_s_an);
@@ -130,6 +132,7 @@ char *get_ip(const char *fqdn, char *dispbuf, size_t buflen, int aaaa) {
         }
     }
 
+    dispbuf[0]=0;
     return NULL;
 }
 
@@ -141,8 +144,8 @@ void loop(char * const *cmd, const char *fqdn, int stime, int aaaa) {
     get_ip(fqdn, o_ip, sizeof(o_ip), aaaa);
 
     for(;;) {
-        if( get_ip(fqdn, n_ip, sizeof(n_ip), aaaa)!=NULL
-                && strcmp(o_ip, n_ip)!=0) {
+        get_ip(fqdn, n_ip, sizeof(n_ip), aaaa);
+        if(strcmp(o_ip, n_ip)!=0) {
 
             setenv("ADDRESS", n_ip, 1);
 
