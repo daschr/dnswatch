@@ -191,6 +191,7 @@ void loop(char * const *cmd, const char *fqdn, int stime, int aaaa) {
                     strcat(addresses, ",");
             }
             setenv("ADDRESSES", addresses, 1);
+            setenv("ADDRESS", addresses, 1);
             free(addresses);
 
             if(fork()==0)
