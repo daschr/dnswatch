@@ -8,7 +8,7 @@ Wait for changes of DNS A/AAAA records and run a given command each time.
 ## usage
 `dnswatch [@<nameserver>|T<stime>|AAAA] [--] [fqdn] [command] [args]...`
 
- The changed records are stored in the envvar `$ADDRESSES`.
+ The changed records are stored in the envvars `$ADDRESSES` and `$ADDRESS`.
 
 ## "But for what is it good for?!?"
 
