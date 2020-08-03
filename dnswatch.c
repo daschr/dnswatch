@@ -12,17 +12,30 @@
 #define S_BUFLEN 1024
 #define S_STIME 60
 #define S_NAMESERVER "1.1.1.1"
+#define MAX_RECORDS 24
+#define RECORD_SIZE 128
 
 #ifdef USE_DEPRECATED
 typedef struct __res_state * res_state;
 #endif
 res_state state_p=NULL;
 
+char **o_records, **n_records;
+
 void sig_handler(int ec) {
 #ifndef USE_DEPRECATED
     if(state_p!=NULL)
         res_nclose(state_p);
 #endif
+
+    for(int i=0; i<MAX_RECORDS; ++i) {
+        free(n_records[i]);
+        free(o_records[i]);
+    }
+
+    free(n_records);
+    free(o_records);
+
     exit(0);
 }
 
@@ -93,71 +106,103 @@ int setup_resolver(res_state sp, struct sockaddr_in *addr, const char *nameserve
 }
 
 
-char *get_ip(const char *fqdn, char *dispbuf, size_t buflen, int aaaa) {
+int get_records(const char *fqdn, char **dispbuf, size_t element_maxsize, size_t maxnum_elems, int aaaa) {
     ns_msg msg;
     ns_rr rr;
     unsigned char abuf[S_BUFLEN];
     int len;
 
     int addr_type=aaaa?T_AAAA:T_A;
+    int record_pos=0;
+
+    for(int i=0; i<maxnum_elems; ++i)
+        dispbuf[i][0]='\0';
+
+
 #ifndef USE_DEPRECATED
-    if((len=res_nquery(state_p, fqdn, C_IN, addr_type, abuf, sizeof(abuf)))<0) {
+    if((len=res_nquery(state_p, fqdn, C_IN, addr_type, abuf, sizeof(abuf)))<0)
 #else
-    if((len=res_query(fqdn, C_IN, addr_type, abuf, sizeof(abuf)))<0) {
+    if((len=res_query(fqdn, C_IN, addr_type, abuf, sizeof(abuf)))<0)
 #endif
-        dispbuf[0]=0;
-        return NULL;
-    }
+        return 0;
 
     ns_initparse(abuf, len, &msg);
     len=ns_msg_count(msg, ns_s_an);
 
     for(int i=0; i<len; ++i) {
+        if(record_pos == maxnum_elems)
+            break;
+
         ns_parserr(&msg, ns_s_an, i, &rr);
         switch(ns_rr_type(rr)) {
         case ns_t_a:
             if(ns_rr_rdlen(rr)!=NS_INADDRSZ)
                 break;
-            inet_ntop(AF_INET, ns_rr_rdata(rr), dispbuf, buflen);
-            return dispbuf;
+            inet_ntop(AF_INET, ns_rr_rdata(rr), dispbuf[record_pos++], element_maxsize);
             break;
         case ns_t_aaaa:
             if(ns_rr_rdlen(rr)!=NS_IN6ADDRSZ)
                 break;
-            inet_ntop(AF_INET6, ns_rr_rdata(rr), dispbuf, buflen);
-            return dispbuf;
+            inet_ntop(AF_INET6, ns_rr_rdata(rr), dispbuf[record_pos++], element_maxsize);
             break;
         default:
             break;
         }
     }
 
-    dispbuf[0]=0;
-    return NULL;
+    return record_pos;
+}
+
+int cmp_records(char **l_records, char **r_records, size_t num_records) {
+    for(int i=num_records-1; i>=0; --i)
+        if(strcmp(l_records[i], r_records[i]) != 0)
+            return 1;
+    return 0;
+}
+
+int cmp_rectuple(const void *v1, const void *v2) {
+    return strcmp(*((const char **) v1), *((const char **) v2));
 }
 
 void loop(char * const *cmd, const char *fqdn, int stime, int aaaa) {
-    char o_ip[128], n_ip[128];
-    memset(o_ip, 0, sizeof(o_ip));
-    memset(n_ip, 0, sizeof(n_ip));
+    char **temp_records;
+    n_records=malloc(sizeof(char *)*MAX_RECORDS);
+    o_records=malloc(sizeof(char *)*MAX_RECORDS);
 
-    get_ip(fqdn, o_ip, sizeof(o_ip), aaaa);
+    for(int i=0; i<MAX_RECORDS; ++i) {
+        n_records[i]=malloc(RECORD_SIZE);
+        o_records[i]=malloc(RECORD_SIZE);
+    }
+
+    int totnum_records=get_records(fqdn, o_records, RECORD_SIZE, MAX_RECORDS, aaaa);
+    qsort(o_records, MAX_RECORDS, sizeof(char *), cmp_rectuple);
 
     for(;;) {
-        get_ip(fqdn, n_ip, sizeof(n_ip), aaaa);
-        if(strcmp(o_ip, n_ip)!=0) {
+        totnum_records=get_records(fqdn, n_records, RECORD_SIZE, MAX_RECORDS, aaaa);
+        qsort(n_records, MAX_RECORDS, sizeof(char *), cmp_rectuple);
 
-            setenv("ADDRESS", n_ip, 1);
+        if(cmp_records(o_records, n_records, MAX_RECORDS)) {
+
+            char *addresses=malloc(totnum_records*RECORD_SIZE+totnum_records);
+            memset(addresses, 0, totnum_records*RECORD_SIZE+totnum_records);
+            for(int i=0; i<totnum_records; ++i) {
+                strcat(addresses, n_records[MAX_RECORDS-1-i]);
+                if(i != totnum_records-1)
+                    strcat(addresses, ",");
+            }
+            setenv("ADDRESSES", addresses, 1);
+            free(addresses);
 
             if(fork()==0)
                 execvp(cmd[0], cmd);
 
-            strncpy(o_ip, n_ip, sizeof(o_ip));
+            temp_records=o_records;
+            o_records=n_records;
+            n_records=temp_records;
         }
 
         sleep(stime);
     }
-
 }
 
 void help(char *pname) {
