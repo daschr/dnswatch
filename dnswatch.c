@@ -47,6 +47,7 @@ void loop(char * const *, const char *, int, int);
 int main(int ac, char *as[]) {
     signal(SIGINT, sig_handler);
     signal(SIGTERM, sig_handler);
+    signal(SIGCHLD, SIG_IGN);
 
     char *cmd[ac];
     for(int i=0; i<ac; ++i) cmd[i]=NULL;
